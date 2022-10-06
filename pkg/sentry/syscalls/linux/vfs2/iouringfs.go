@@ -86,11 +86,18 @@ func IOUringEnter(t *kernel.Task, args arch.SyscallArguments) (uintptr, *kernel.
 	ret := -1
 
 	// List of currently supported flags for io_uring_enter(2).
-	const supportedFlags = 0 // Currently support none
+	const supportedFlags = linux.IORING_ENTER_GETEVENTS
+	// List of currently required flags.
+	const requiredFlags = linux.IORING_ENTER_GETEVENTS
 
 	// Since we don't implement everything, we fail explicitly on flags that are unimplemented.
 	if flags|supportedFlags != supportedFlags {
 		return uintptr(ret), nil, linuxerr.EINVAL
+	}
+
+	// Currently we require some flags to be set.
+	if flags&requiredFlags != requiredFlags {
+		return 0, nil, linuxerr.EINVAL
 	}
 
 	// Currently don't support replacing an existing signal mask.
@@ -112,7 +119,7 @@ func IOUringEnter(t *kernel.Task, args arch.SyscallArguments) (uintptr, *kernel.
 	if !ok {
 		return uintptr(ret), nil, linuxerr.EBADF
 	}
-	ret, err := iouringfd.ProcessSubmissions(toSubmit, minComplete, flags)
+	ret, err := iouringfd.ProcessSubmissions(t, toSubmit, minComplete, flags)
 	if err != nil {
 		return uintptr(ret), nil, err
 	}

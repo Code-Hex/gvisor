@@ -16,8 +16,17 @@
 
 #include <memory>
 
+#include "test/util/temp_path.h"
+#include "test/util/test_util.h"
+
 namespace gvisor {
 namespace testing {
+
+void output_to_console(char *buf, int len) {
+  while (len--) {
+    fputc(*buf++, stdout);
+  }
+}
 
 PosixErrorOr<std::unique_ptr<IOUring>> IOUring::InitIOUring(
     unsigned int entries, IOUringParams &params) {
@@ -111,6 +120,97 @@ IOUringSqe *IOUring::get_sqes() {
 uint32_t IOUring::get_sq_mask() { return sq_mask_; }
 
 unsigned *IOUring::get_sq_array() { return sq_array_; }
+
+IOUringTestFile::IOUringTestFile(std::string text) : file_rw_offset_{0} {
+  file_name_ = NewTempAbsPath();
+  fd_ = open(file_name_.c_str(), O_CREAT, 0644);
+  if (fd_ < 0) {
+    fd_ = -1;
+
+    return;
+  }
+  close(fd_);
+  fd_ = open(file_name_.c_str(), O_RDWR);
+
+  Write(std::move(text));
+}
+
+IOUringTestFile::~IOUringTestFile() {
+  close(fd_);
+  unlink(file_name_.c_str());
+  if (file_info_ != nullptr) {
+    free(file_info_);
+  }
+}
+
+// TODO: return should be value or posix error
+void IOUringTestFile::Write(std::string &&text) {
+  PwriteFd(fd_, text.c_str(), text.size(), file_rw_offset_);
+  file_rw_offset_ += text.size();
+  UpdateTestFileInfo();
+}
+
+void IOUringTestFile::UpdateTestFileInfo() {
+  off_t bytes_remaining = FileSize();
+  unsigned current_block = 0;
+
+  num_blocks_ = (int)bytes_remaining / BLOCK_SZ;
+  if (bytes_remaining % BLOCK_SZ) {
+    num_blocks_++;
+  }
+
+  file_info_ = (struct file_info *)malloc(sizeof(off_t) +
+                                          sizeof(struct iovec) * num_blocks_);
+  file_info_->file_sz = FileSize();
+
+  while (bytes_remaining) {
+    off_t bytes_to_read = bytes_remaining;
+    if (bytes_to_read > BLOCK_SZ) bytes_to_read = BLOCK_SZ;
+
+    file_info_->iovecs[current_block].iov_len = bytes_to_read;
+
+    void *buf;
+    if (posix_memalign(&buf, BLOCK_SZ, BLOCK_SZ)) {
+      perror("posix_memalign");
+      return;
+    }
+    file_info_->iovecs[current_block].iov_base = buf;
+
+    current_block++;
+    bytes_remaining -= bytes_to_read;
+  }
+}
+
+// TODO: return should be value or posix error
+off_t IOUringTestFile::FileSize() const {
+  struct stat st;
+
+  if (fstat(fd_, &st) < 0) {
+    return -1;
+  }
+
+  if (S_ISBLK(st.st_mode)) {
+    uint64_t bytes;
+    if (ioctl(fd_, BLKGETSIZE64, &bytes) != 0) {
+      return -1;
+    }
+
+    return bytes;
+  }
+  if (S_ISREG(st.st_mode)) {
+    return st.st_size;
+  }
+
+  return -1;
+}
+
+TestFileInfo *IOUringTestFile::FileInfo() {
+  if (file_info_ == nullptr) {
+    UpdateTestFileInfo();
+  }
+
+  return file_info_;
+}
 
 }  // namespace testing
 }  // namespace gvisor

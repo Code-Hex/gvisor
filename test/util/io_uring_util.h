@@ -16,6 +16,7 @@
 #define GVISOR_TEST_UTIL_IOURING_UTIL_H_
 
 #include <linux/fs.h>
+#include <sys/ioctl.h>
 #include <sys/mman.h>
 
 #include <atomic>
@@ -36,6 +37,9 @@ namespace testing {
 #define IORING_SETUP_SQPOLL (1U << 1)
 #define IORING_SETUP_CQSIZE (1U << 3)
 
+// io_uring_enter(2) flags
+#define IORING_ENTER_GETEVENTS (1U << 0)
+
 #define IORING_FEAT_SINGLE_MMAP (1U << 0)
 
 #define IORING_OFF_SQ_RING 0ULL
@@ -44,6 +48,14 @@ namespace testing {
 
 // IO_URING operation codes.
 #define IORING_OP_NOP 0
+#define IORING_OP_READV 1
+
+#define BLOCK_SZ 1024
+
+struct file_info {
+  off_t file_sz;
+  struct iovec iovecs[];
+};
 
 struct io_sqring_offsets {
   uint32_t head;
@@ -144,6 +156,7 @@ struct io_uring_sqe {
   };
 };
 
+using TestFileInfo = struct file_info;
 using IOSqringOffsets = struct io_sqring_offsets;
 using ICqringOffsets = struct io_cqring_offsets;
 using IOUringCqe = struct io_uring_cqe;
@@ -196,6 +209,30 @@ class IOUring {
   void *cq_ptr_ = nullptr;
   void *sqe_ptr_ = nullptr;
 };
+
+class IOUringTestFile {
+ public:
+  IOUringTestFile() = delete;
+  IOUringTestFile(std::string text);
+  ~IOUringTestFile();
+
+  int Fd() { return fd_; }
+  TestFileInfo *FileInfo();
+  off_t FileSize() const;
+  int NumBlocks() const { return num_blocks_; }
+
+ private:
+  int fd_;
+  off_t file_rw_offset_;
+  std::string file_name_;
+  TestFileInfo *file_info_ = nullptr;
+  int num_blocks_;
+
+  void Write(std::string &&text);
+  void UpdateTestFileInfo();
+};
+
+void output_to_console(char *buf, int len);
 
 // This is a wrapper for the io_uring_setup(2) system call.
 inline int IOUringSetup(uint32_t entries, IOUringParams *params) {

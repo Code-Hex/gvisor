@@ -26,6 +26,11 @@ const (
 	IORING_SETUP_SUBMIT_ALL = (1 << 7)
 )
 
+// Constants for io_uring_enter(2). See include/uapi/linux/io_uring.h.
+const (
+	IORING_ENTER_GETEVENTS = (1 << 0)
+)
+
 // Constants for IoUringParams.Features. See include/uapi/linux/io_uring.h.
 const (
 	IORING_FEAT_SINGLE_MMAP = (1 << 0)
@@ -162,10 +167,10 @@ type IOUringSqe struct {
 	Opcode              uint8
 	Flags               uint8
 	ioPrio              uint16
-	fd                  int32
-	offOrAddrOrCmdOp    uint64
-	addrOrSpliceOff     uint64
-	len                 uint32
+	Fd                  int32
+	OffOrAddrOrCmdOp    uint64
+	AddrOrSpliceOff     uint64
+	Len                 uint32
 	specialFlags        uint32
 	UserData            uint64
 	bufIndexOrGroup     uint16

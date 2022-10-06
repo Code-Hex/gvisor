@@ -29,13 +29,16 @@ import (
 	"gvisor.dev/gvisor/pkg/abi/linux"
 	"gvisor.dev/gvisor/pkg/atomicbitops"
 	"gvisor.dev/gvisor/pkg/context"
+	"gvisor.dev/gvisor/pkg/errors"
 	"gvisor.dev/gvisor/pkg/errors/linuxerr"
 	"gvisor.dev/gvisor/pkg/hostarch"
 	"gvisor.dev/gvisor/pkg/safemem"
+	"gvisor.dev/gvisor/pkg/sentry/kernel"
 	"gvisor.dev/gvisor/pkg/sentry/memmap"
 	"gvisor.dev/gvisor/pkg/sentry/pgalloc"
 	"gvisor.dev/gvisor/pkg/sentry/usage"
 	"gvisor.dev/gvisor/pkg/sentry/vfs"
+	"gvisor.dev/gvisor/pkg/usermem"
 )
 
 // FileDescription implements vfs.FileDescriptionImpl for file-based IO_URING.
@@ -313,7 +316,7 @@ func (fd *FileDescription) ConfigureMMap(ctx context.Context, opts *memmap.MMapO
 }
 
 // ProcessSubmissions processes submission requests.
-func (fd *FileDescription) ProcessSubmissions(toSubmit uint32, minComplete uint32, flags uint32) (int, error) {
+func (fd *FileDescription) ProcessSubmissions(t *kernel.Task, toSubmit uint32, minComplete uint32, flags uint32) (int, error) {
 	fd.mu.Lock()
 	defer fd.mu.Unlock()
 
@@ -345,7 +348,7 @@ func (fd *FileDescription) ProcessSubmissions(toSubmit uint32, minComplete uint3
 			return -1, err
 		}
 
-		cqe, err := fd.ProcessSubmission(&sqe, flags)
+		cqe, err := fd.ProcessSubmission(t, &sqe, flags)
 		if err != nil {
 			return -1, err
 		}
@@ -371,21 +374,70 @@ func (fd *FileDescription) ProcessSubmissions(toSubmit uint32, minComplete uint3
 }
 
 // ProcessSubmission processes a single submission request.
-func (fd *FileDescription) ProcessSubmission(sqe *linux.IOUringSqe, flags uint32) (*linux.IOUringCqe, error) {
+func (fd *FileDescription) ProcessSubmission(t *kernel.Task, sqe *linux.IOUringSqe, flags uint32) (*linux.IOUringCqe, error) {
+	var cqeErr *errors.Error = nil
+	var cqeFlags uint32 = 0
+	var err error = nil
+	var retValue int32 = 0
 	switch op := sqe.Opcode; op {
-	case 0: // NOP
-		return &linux.IOUringCqe{
-			UserData: sqe.UserData,
-			Res:      0,
-			Flags:    0,
-		}, nil
+	case 0: // IORING_OP_NOP
+		cqeErr = nil
+	case 1: // IORING_OP_READV
+		retValue, cqeErr, err = fd.handleReadv(t, sqe, flags)
 	default: // Unsupported operation
+		cqeErr = linuxerr.EINVAL
+	}
+
+	if err != nil {
 		return &linux.IOUringCqe{
 			UserData: sqe.UserData,
-			Res:      -int32(linuxerr.EINVAL.Errno()),
-			Flags:    0,
-		}, nil
+			Res:      -1,
+			Flags:    cqeFlags,
+		}, err
 	}
+
+	if cqeErr != nil {
+		retValue = -int32(cqeErr.Errno())
+	}
+
+	return &linux.IOUringCqe{
+		UserData: sqe.UserData,
+		Res:      retValue,
+		Flags:    cqeFlags,
+	}, nil
+}
+
+// handleReadv handles IORING_OP_READV.
+func (fd *FileDescription) handleReadv(t *kernel.Task, sqe *linux.IOUringSqe, flags uint32) (int32, *errors.Error, error) {
+	// Check that a file descriptor is valid.
+	if sqe.Fd < 0 {
+		return 0, linuxerr.EBADF, nil
+	}
+	// Currently we don't support any flags for the SQEs.
+	if sqe.Flags != 0 {
+		return 0, linuxerr.EINVAL, nil
+	}
+	// If the file is not seekable then offset must be zero. And currently, we don't support them.
+	if sqe.OffOrAddrOrCmdOp != 0 {
+		return 0, linuxerr.EINVAL, nil
+	}
+	dst, err := t.IovecsIOSequence(hostarch.Addr(sqe.AddrOrSpliceOff), int(sqe.Len), usermem.IOOpts{
+		AddressSpaceActive: true,
+	})
+	if err != nil {
+		return 0, linuxerr.EINVAL, nil
+	}
+	file := t.GetFileVFS2(sqe.Fd)
+	if file == nil {
+		return 0, linuxerr.EBADF, nil
+	}
+	defer file.DecRef(t)
+	n, err := file.PRead(t, dst, 0, vfs.ReadOptions{})
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return int32(n), nil, nil
 }
 
 // updateCq updates a completion queue by adding a given completion queue entry.

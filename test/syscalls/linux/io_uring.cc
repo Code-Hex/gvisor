@@ -38,6 +38,48 @@ namespace testing {
 
 namespace {
 
+// MatchesStringLength checks that a tuple argument of (struct iovec *, int)
+// corresponding to an iovec array and its length, contains data that matches
+// the string length strlen.
+MATCHER_P(MatchesStringLength, strlen, "") {
+  struct iovec *iovs = arg.first;
+  int niov = arg.second;
+  int offset = 0;
+  for (int i = 0; i < niov; i++) {
+    offset += iovs[i].iov_len;
+  }
+  if (offset != static_cast<int>(strlen)) {
+    *result_listener << offset;
+    return false;
+  }
+  return true;
+}
+
+// MatchesStringValue checks that a tuple argument of (struct iovec *, int)
+// corresponding to an iovec array and its length, contains data that matches
+// the string value str.
+MATCHER_P(MatchesStringValue, str, "") {
+  struct iovec *iovs = arg.first;
+  int len = strlen(str);
+  int niov = arg.second;
+  int offset = 0;
+  for (int i = 0; i < niov; i++) {
+    struct iovec iov = iovs[i];
+    if (len < offset) {
+      *result_listener << "strlen " << len << " < offset " << offset;
+      return false;
+    }
+    if (strncmp(static_cast<char *>(iov.iov_base), &str[offset], iov.iov_len)) {
+      absl::string_view iovec_string(static_cast<char *>(iov.iov_base),
+                                     iov.iov_len);
+      *result_listener << iovec_string << " @offset " << offset;
+      return false;
+    }
+    offset += iov.iov_len;
+  }
+  return true;
+}
+
 // Testing that io_uring_setup(2) successfully returns a valid file descriptor.
 TEST(IOUringTest, ValidFD) {
   IOUringParams params;
@@ -209,7 +251,7 @@ TEST(IOUringTest, SingleNOPTest) {
   uint32_t sq_tail = io_uring->load_sq_tail();
   io_uring->store_sq_tail(sq_tail + 1);
 
-  int ret = io_uring->Enter(1, 1, 0, nullptr);
+  int ret = io_uring->Enter(1, 1, IORING_ENTER_GETEVENTS, nullptr);
   ASSERT_EQ(ret, 1);
 
   IOUringCqe *cqe = io_uring->get_cqes();
@@ -250,7 +292,7 @@ TEST(IOUringTest, QueueingNOPTest) {
   ASSERT_EQ(sq_tail, 0);
   io_uring->store_sq_tail(sq_tail + 4);
 
-  int ret = io_uring->Enter(2, 2, 0, nullptr);
+  int ret = io_uring->Enter(2, 2, IORING_ENTER_GETEVENTS, nullptr);
   ASSERT_EQ(ret, 2);
 
   IOUringCqe *cqe = io_uring->get_cqes();
@@ -269,7 +311,7 @@ TEST(IOUringTest, QueueingNOPTest) {
   uint32_t cq_head = io_uring->load_cq_head();
   io_uring->store_cq_head(cq_head + 2);
 
-  ret = io_uring->Enter(2, 2, 0, nullptr);
+  ret = io_uring->Enter(2, 2, IORING_ENTER_GETEVENTS, nullptr);
   ASSERT_EQ(ret, 2);
 
   sq_head = io_uring->load_sq_head();
@@ -310,7 +352,7 @@ TEST(IOUringTest, MultipleNOPTest) {
   ASSERT_EQ(sq_tail, 0);
   io_uring->store_sq_tail(sq_tail + 3);
 
-  int ret = io_uring->Enter(3, 3, 0, nullptr);
+  int ret = io_uring->Enter(3, 3, IORING_ENTER_GETEVENTS, nullptr);
   ASSERT_EQ(ret, 3);
 
   IOUringCqe *cqe = io_uring->get_cqes();
@@ -356,7 +398,7 @@ TEST(IOUringTest, MultiThreadedNOPTest) {
   for (int i = 0; i < 4; i++) {
     ScopedThread t([&] {
       IOUring *io_uring_ptr = io_uring.get();
-      int ret = io_uring_ptr->Enter(1, 1, 0, nullptr);
+      int ret = io_uring_ptr->Enter(1, 1, IORING_ENTER_GETEVENTS, nullptr);
       ASSERT_EQ(ret, 1);
     });
   }
@@ -395,7 +437,7 @@ TEST(IOUringTest, InvalidOpCodeTest) {
   uint32_t sq_tail = io_uring->load_sq_tail();
   io_uring->store_sq_tail(sq_tail + 1);
 
-  int ret = io_uring->Enter(1, 1, 0, nullptr);
+  int ret = io_uring->Enter(1, 1, IORING_ENTER_GETEVENTS, nullptr);
   ASSERT_EQ(ret, 1);
 
   IOUringCqe *cqe = io_uring->get_cqes();
@@ -436,7 +478,7 @@ TEST(IOUringTest, SQERingBuffersWrapAroundTest) {
   uint32_t sq_tail = io_uring->load_sq_tail();
   io_uring->store_sq_tail(sq_tail + 4);
 
-  int ret = io_uring->Enter(4, 4, 0, nullptr);
+  int ret = io_uring->Enter(4, 4, IORING_ENTER_GETEVENTS, nullptr);
   ASSERT_EQ(ret, 4);
 
   IOUringCqe *cqe = io_uring->get_cqes();
@@ -462,7 +504,7 @@ TEST(IOUringTest, SQERingBuffersWrapAroundTest) {
   sq_tail = io_uring->load_sq_tail();
   io_uring->store_sq_tail(sq_tail + 4);
 
-  ret = io_uring->Enter(4, 4, 0, nullptr);
+  ret = io_uring->Enter(4, 4, IORING_ENTER_GETEVENTS, nullptr);
   ASSERT_EQ(ret, 4);
 
   sq_head = io_uring->load_sq_head();
@@ -499,7 +541,7 @@ TEST(IOUringTest, NonNullSigsetTest) {
     io_uring->store_sq_tail(sq_tail + 1);
 
     sigset_t non_null_sigset;
-    EXPECT_THAT(io_uring->Enter(1, 1, 0, &non_null_sigset),
+    EXPECT_THAT(io_uring->Enter(1, 1, IORING_ENTER_GETEVENTS, &non_null_sigset),
                 SyscallFailsWithErrno(EFAULT));
   }
 }
@@ -534,7 +576,7 @@ TEST(IOUringTest, OverflowCQTest) {
       ASSERT_EQ(sq_tail, 4 * submission_round);
       io_uring->store_sq_tail(sq_tail + 4);
 
-      int ret = io_uring->Enter(4, 4, 0, nullptr);
+      int ret = io_uring->Enter(4, 4, IORING_ENTER_GETEVENTS, nullptr);
       ASSERT_EQ(ret, 4);
 
       sq_head = io_uring->load_sq_head();
@@ -567,7 +609,7 @@ TEST(IOUringTest, OverflowCQTest) {
     ASSERT_EQ(sq_tail, 8);
     io_uring->store_sq_tail(sq_tail + 2);
 
-    int ret = io_uring->Enter(2, 2, 0, nullptr);
+    int ret = io_uring->Enter(2, 2, IORING_ENTER_GETEVENTS, nullptr);
     ASSERT_EQ(ret, 2);
 
     sq_head = io_uring->load_sq_head();
@@ -587,6 +629,68 @@ TEST(IOUringTest, OverflowCQTest) {
     uint32_t cq_overflow_counter = io_uring->load_cq_overflow();
     ASSERT_EQ(cq_overflow_counter, 2);
   }
+}
+
+// Testing that io_uring_enter(2) successfully handles single READV operation.
+TEST(IOUringTest, SingleREADVTest) {
+  struct io_uring_params params;
+  std::unique_ptr<IOUring> io_uring =
+      ASSERT_NO_ERRNO_AND_VALUE(IOUring::InitIOUring(1, params));
+
+  ASSERT_EQ(params.sq_entries, 1);
+  ASSERT_EQ(params.cq_entries, 2);
+
+  uint32_t sq_head = io_uring->load_sq_head();
+  ASSERT_EQ(sq_head, 0);
+
+  IOUringTestFile test_file("Hello, IO_URING!\n");
+  ASSERT_GE(test_file.Fd(), 0);
+
+  off_t file_sz = test_file.FileSize();
+  ASSERT_GT(file_sz, 0);
+
+  unsigned *sq_array = io_uring->get_sq_array();
+  struct io_uring_sqe *sqe = io_uring->get_sqes();
+
+  sqe->flags = 0;
+  sqe->fd = test_file.Fd();
+  sqe->opcode = IORING_OP_READV;
+  // sqe->addr = (unsigned long) test_file.FileInfo()->iovecs;
+  sqe->addr = reinterpret_cast<uint64_t>(test_file.FileInfo()->iovecs);
+  sqe->len = test_file.NumBlocks();
+  sqe->off = 0;
+  // sqe->user_data = (unsigned long long) test_file.FileInfo();
+  sqe->user_data = reinterpret_cast<uint64_t>(test_file.FileInfo());
+  sq_array[0] = 0;
+
+  uint32_t sq_tail = io_uring->load_sq_tail();
+  io_uring->store_sq_tail(sq_tail + 1);
+
+  int ret = io_uring->Enter(1, 1, IORING_ENTER_GETEVENTS, nullptr);
+  ASSERT_EQ(ret, 1);
+
+  struct io_uring_cqe *cqe = io_uring->get_cqes();
+
+  sq_head = io_uring->load_sq_head();
+  ASSERT_EQ(sq_head, 1);
+
+  uint32_t cq_tail = io_uring->load_cq_tail();
+  ASSERT_EQ(cq_tail, 1);
+
+  ASSERT_EQ(cqe->res, file_sz);
+
+  TestFileInfo *fi = (TestFileInfo *)malloc(
+      sizeof(off_t) + sizeof(struct iovec) * test_file.NumBlocks());
+  ASSERT_TRUE(fi != nullptr);
+
+  fi = (TestFileInfo *)cqe->user_data;
+
+  std::pair<struct iovec *, int> iovec_desc(fi->iovecs, test_file.NumBlocks());
+  EXPECT_THAT(iovec_desc, MatchesStringLength(test_file.FileSize()));
+  EXPECT_THAT(iovec_desc, MatchesStringValue("Hello, IO_URING!\n"));
+
+  uint32_t cq_head = io_uring->load_cq_head();
+  io_uring->store_cq_head(cq_head + 1);
 }
 
 }  // namespace

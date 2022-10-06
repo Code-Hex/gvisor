@@ -10,13 +10,16 @@ go_library(
         "//pkg/abi/linux",
         "//pkg/atomicbitops",
         "//pkg/context",
+        "//pkg/errors",
         "//pkg/errors/linuxerr",
         "//pkg/hostarch",
         "//pkg/safemem",
+        "//pkg/sentry/kernel",
         "//pkg/sentry/memmap",
         "//pkg/sentry/pgalloc",
         "//pkg/sentry/usage",
         "//pkg/sentry/vfs",
+        "//pkg/usermem",
     ],
 )
 
