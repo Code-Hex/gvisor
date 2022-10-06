@@ -241,6 +241,7 @@ func New(args Args) (*Loader, error) {
 	kernel.VFS2Enabled = true
 	kernel.FUSEEnabled = args.Conf.FUSE
 	kernel.LISAFSEnabled = args.Conf.Lisafs
+	kernel.IOUringFSEnabled = args.Conf.IOUringFS
 	bufferv2.PoolingEnabled = args.Conf.BufferPooling
 	vfs2.Override()
 

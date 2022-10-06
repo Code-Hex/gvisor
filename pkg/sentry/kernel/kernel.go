@@ -91,6 +91,10 @@ var VFS2Enabled = false
 // TODO(gvisor.dev/issue/7911): Remove when 9P is deleted.
 var LISAFSEnabled = false
 
+// IOUringFSEnabled is set to true when iouringfs is enabled. Added as a global
+// to allow easy access everywhere.
+var IOUringFSEnabled = false
+
 // FUSEEnabled is set to true when FUSE is enabled. Added as a global to allow
 // easy access everywhere. To be removed once FUSE is completed.
 var FUSEEnabled = false
