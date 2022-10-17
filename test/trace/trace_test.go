@@ -324,13 +324,13 @@ func checkSentryExec(msg test.Message) error {
 	if err := checkContextData(p.ContextData); err != nil {
 		return err
 	}
-	if want := "/bin/true"; want != p.BinaryPath {
+	if want := "/bin/true"; !strings.Contains(p.BinaryPath, want) {
 		return fmt.Errorf("wrong BinaryPath, want: %q, got: %q", want, p.BinaryPath)
 	}
 	if len(p.Argv) == 0 {
 		return fmt.Errorf("empty Argv")
 	}
-	if p.Argv[0] != p.BinaryPath {
+	if !strings.Contains(p.BinaryPath, p.Argv[0]) {
 		return fmt.Errorf("wrong Argv[0], want: %q, got: %q", p.BinaryPath, p.Argv[0])
 	}
 	if len(p.Env) == 0 {
