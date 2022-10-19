@@ -76,6 +76,8 @@ type nic struct {
 	packetEPs map[tcpip.NetworkProtocolNumber]*packetEndpointList
 
 	qDisc QueueingDiscipline
+
+	gro groDispatcher
 }
 
 // makeNICStats initializes the NIC statistics and associates them to the global
@@ -199,6 +201,7 @@ func newNIC(stack *Stack, id tcpip.NICID, ep LinkEndpoint, opts NICOptions) *nic
 		}
 	}
 
+	nic.gro.init()
 	nic.NetworkLinkEndpoint.Attach(nic)
 
 	return nic
@@ -733,7 +736,7 @@ func (n *nic) DeliverNetworkPacket(protocol tcpip.NetworkProtocolNumber, pkt Pac
 
 	pkt.RXTransportChecksumValidated = n.NetworkLinkEndpoint.Capabilities()&CapabilityRXChecksumOffload != 0
 
-	networkEndpoint.HandlePacket(pkt)
+	n.gro.dispatch(pkt, networkEndpoint)
 }
 
 func (n *nic) DeliverLinkPacket(protocol tcpip.NetworkProtocolNumber, pkt PacketBufferPtr, incoming bool) {
