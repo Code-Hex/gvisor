@@ -104,6 +104,10 @@ type Config struct {
 	// retains its old name of "software" GSO for API consistency.
 	GvisorGSO bool `flag:"software-gso"`
 
+	// GvisorGROTimeout sets gVisor's generic receive offload in
+	// nanoseconds. Zero bypasses GRO.
+	GvisorGROTimeout int `flag:"gvisor-gro"`
+
 	// TXChecksumOffload indicates that TX Checksum Offload is enabled.
 	TXChecksumOffload bool `flag:"tx-checksum-offload"`
 

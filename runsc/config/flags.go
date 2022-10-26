@@ -96,6 +96,7 @@ func RegisterFlags(flagSet *flag.FlagSet) {
 	flagSet.Bool("net-raw", false, "enable raw sockets. When false, raw sockets are disabled by removing CAP_NET_RAW from containers (`runsc exec` will still be able to utilize raw sockets). Raw sockets allow malicious containers to craft packets and potentially attack the network.")
 	flagSet.Bool("gso", true, "enable host segmentation offload if it is supported by a network device.")
 	flagSet.Bool("software-gso", true, "enable gVisor segmentation offload when host offload can't be enabled.")
+	flagSet.Int("gvisor-gro", 0, "sets gVisor's generic receive offload in nanoseconds. Zero bypasses GRO.")
 	flagSet.Bool("tx-checksum-offload", false, "enable TX checksum offload.")
 	flagSet.Bool("rx-checksum-offload", true, "enable RX checksum offload.")
 	flagSet.Var(queueingDisciplinePtr(QDiscFIFO), "qdisc", "specifies which queueing discipline to apply by default to the non loopback nics used by the sandbox.")

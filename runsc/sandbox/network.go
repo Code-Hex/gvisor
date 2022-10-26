@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"time"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
@@ -300,6 +301,7 @@ func createInterfacesAndRoutesFromNS(conn *urpc.Client, nsPath string, conf *con
 				link.GSOMaxSize = stack.GvisorGSOMaxSize
 				link.GvisorGSOEnabled = true
 			}
+			link.GvisorGROTimeout = time.Duration(conf.GvisorGROTimeout) * time.Nanosecond
 
 			args.FDBasedLinks = append(args.FDBasedLinks, link)
 		}

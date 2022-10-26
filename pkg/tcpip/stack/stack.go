@@ -710,6 +710,33 @@ func (s *Stack) SetPortRange(start uint16, end uint16) tcpip.Error {
 	return s.PortManager.SetPortRange(start, end)
 }
 
+// GROTimeout returns the GRO timeout.
+func (s *Stack) GROTimeout(id int32) (time.Duration, tcpip.Error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	nic, ok := s.nics[tcpip.NICID(id)]
+	if !ok {
+		return 0, &tcpip.ErrUnknownNICID{}
+	}
+
+	return nic.gro.getInterval(), nil
+}
+
+// SetGROTimeout sets teh GRO timeout.
+func (s *Stack) SetGROTimeout(id int32, timeout time.Duration) tcpip.Error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	nic, ok := s.nics[tcpip.NICID(id)]
+	if !ok {
+		return &tcpip.ErrUnknownNICID{}
+	}
+
+	nic.gro.setInterval(timeout)
+	return nil
+}
+
 // SetRouteTable assigns the route table to be used by this stack. It
 // specifies which NIC to use for given destination address ranges.
 //
@@ -810,6 +837,9 @@ type NICOptions struct {
 
 	// QDisc is the queue discipline to use for this NIC.
 	QDisc QueueingDiscipline
+
+	// GROTimeout specifies the GRO timeout. Zero bypasses GRO.
+	GROTimeout time.Duration
 }
 
 // CreateNICWithOptions creates a NIC with the provided id, LinkEndpoint, and
