@@ -17,62 +17,10 @@
 
 package seccheck
 
+// init registers syscall trace points metadata.
+// Keep them sorted by syscall number.
 func init() {
-	addSyscallPoint(63, "read", []FieldDesc{
-		{
-			ID:   FieldSyscallPath,
-			Name: "fd_path",
-		},
-	})
-	addSyscallPoint(57, "close", []FieldDesc{
-		{
-			ID:   FieldSyscallPath,
-			Name: "fd_path",
-		},
-	})
-	addSyscallPoint(198, "socket", nil)
-	addSyscallPoint(203, "connect", []FieldDesc{
-		{
-			ID:   FieldSyscallPath,
-			Name: "fd_path",
-		},
-	})
-	addSyscallPoint(221, "execve", []FieldDesc{
-		{
-			ID:   FieldSyscallExecveEnvv,
-			Name: "envv",
-		},
-	})
-	addSyscallPoint(56, "openat", []FieldDesc{
-		{
-			ID:   FieldSyscallPath,
-			Name: "fd_path",
-		},
-	})
-	addSyscallPoint(281, "execveat", []FieldDesc{
-		{
-			ID:   FieldSyscallPath,
-			Name: "fd_path",
-		},
-		{
-			ID:   FieldSyscallExecveEnvv,
-			Name: "envv",
-		},
-	})
-	addSyscallPoint(49, "chdir", nil)
-	addSyscallPoint(50, "fchdir", []FieldDesc{
-		{
-			ID:   FieldSyscallPath,
-			Name: "fd_path",
-		},
-	})
-	addSyscallPoint(146, "setuid", nil)
-	addSyscallPoint(144, "setgid", nil)
-	addSyscallPoint(157, "setsid", nil)
-	addSyscallPoint(147, "setresuid", nil)
-	addSyscallPoint(149, "setresgid", nil)
-	addSyscallPoint(261, "prlimit64", nil)
-	addSyscallPoint(51, "chroot", nil)
+	addSyscallPoint(19, "eventfd2", nil)
 	addSyscallPoint(23, "dup", []FieldDesc{
 		{
 			ID:   FieldSyscallPath,
@@ -85,39 +33,13 @@ func init() {
 			Name: "fd_path",
 		},
 	})
-	addSyscallPoint(59, "pipe2", nil)
-	addSyscallPoint(74, "signalfd4", []FieldDesc{
-		{
-			ID:   FieldSyscallPath,
-			Name: "fd_path",
-		},
-	})
 	addSyscallPoint(25, "fcntl", []FieldDesc{
 		{
 			ID:   FieldSyscallPath,
 			Name: "fd_path",
 		},
 	})
-	addSyscallPoint(19, "eventfd2", nil)
-	addSyscallPoint(220, "clone", nil)
-	addSyscallPoint(200, "bind", []FieldDesc{
-		{
-			ID:   FieldSyscallPath,
-			Name: "fd_path",
-		},
-	})
-	addSyscallPoint(202, "accept", []FieldDesc{
-		{
-			ID:   FieldSyscallPath,
-			Name: "fd_path",
-		},
-	})
-	addSyscallPoint(242, "accept4", []FieldDesc{
-		{
-			ID:   FieldSyscallPath,
-			Name: "fd_path",
-		},
-	})
+
 	addSyscallPoint(26, "inotify_init1", nil)
 	addSyscallPoint(27, "inotify_add_watch", []FieldDesc{
 		{
@@ -126,6 +48,81 @@ func init() {
 		},
 	})
 	addSyscallPoint(28, "inotify_rm_watch", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(49, "chdir", nil)
+	addSyscallPoint(50, "fchdir", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(51, "chroot", nil)
+	addSyscallPoint(56, "openat", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(57, "close", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(59, "pipe2", nil)
+	addSyscallPoint(63, "read", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(64, "write", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(65, "readv", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(66, "writev", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(67, "pread64", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(68, "pwrite64", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(69, "preadv", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(70, "pwritev", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(74, "signalfd4", []FieldDesc{
 		{
 			ID:   FieldSyscallPath,
 			Name: "fd_path",
@@ -144,7 +141,67 @@ func init() {
 			Name: "fd_path",
 		},
 	})
+	addSyscallPoint(144, "setgid", nil)
+	addSyscallPoint(146, "setuid", nil)
+	addSyscallPoint(147, "setresuid", nil)
+	addSyscallPoint(149, "setresgid", nil)
+	addSyscallPoint(157, "setsid", nil)
+	addSyscallPoint(198, "socket", nil)
 	addSyscallPoint(199, "socketpair", nil)
+	addSyscallPoint(200, "bind", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(202, "accept", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(203, "connect", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(220, "clone", nil)
+	addSyscallPoint(221, "execve", []FieldDesc{
+		{
+			ID:   FieldSyscallExecveEnvv,
+			Name: "envv",
+		},
+	})
+	addSyscallPoint(242, "accept4", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(261, "prlimit64", nil)
+	addSyscallPoint(281, "execveat", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+		{
+			ID:   FieldSyscallExecveEnvv,
+			Name: "envv",
+		},
+	})
+	addSyscallPoint(286, "preadv2", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
+	addSyscallPoint(287, "pwritev2", []FieldDesc{
+		{
+			ID:   FieldSyscallPath,
+			Name: "fd_path",
+		},
+	})
 
 	const lastSyscallInTable = 441
 	for i := 0; i <= lastSyscallInTable; i++ {
