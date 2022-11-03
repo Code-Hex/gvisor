@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"runtime/debug"
@@ -101,6 +102,10 @@ type Boot struct {
 
 	// FDs for profile data.
 	profileFDs profile.FDArgs
+
+	// procMountSyncFD is a file descriptor that has to be closed when the
+	// procfs mount isn't needed anymore.
+	procMountSyncFD int
 }
 
 // Name implements subcommands.Command.Name.
@@ -125,6 +130,7 @@ func (b *Boot) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&b.setUpRoot, "setup-root", false, "if true, set up an empty root for the process")
 	f.BoolVar(&b.pidns, "pidns", false, "if true, the sandbox is in its own PID namespace")
 	f.IntVar(&b.cpuNum, "cpu-num", 0, "number of CPUs to create inside the sandbox")
+	f.IntVar(&b.procMountSyncFD, "proc-mount-sync-fd", -1, "file descriptor that has to be closed when /proc isn't needed")
 	f.Uint64Var(&b.totalMem, "total-memory", 0, "sets the initial amount of total memory to report back to the container")
 	f.BoolVar(&b.attached, "attached", false, "if attached is true, kills the sandbox process when the parent process terminates")
 	f.StringVar(&b.productName, "product-name", "", "value to show in /sys/devices/virtual/dmi/id/product_name")
@@ -184,6 +190,16 @@ func (b *Boot) Execute(_ context.Context, f *flag.FlagSet, args ...interface{}) 
 
 		if !b.applyCaps && !conf.Rootless {
 			// Remove --apply-caps arg to call myself. It has already been done.
+			sks, err := unix.Socketpair(unix.AF_UNIX, unix.SOCK_SEQPACKET, 0)
+			if err != nil {
+				util.Fatalf("error creating a socket pair: %v", err)
+			}
+
+			forkProcUmounter(sks)
+			if b.procMountSyncFD != -1 {
+				panic("procMountSyncFD is set")
+			}
+			b.procMountSyncFD = sks[1]
 			args := b.prepareArgs("setup-root")
 
 			// Note that we've already read the spec from the spec FD, and
@@ -303,6 +319,22 @@ func (b *Boot) Execute(_ context.Context, f *flag.FlagSet, args ...interface{}) 
 	// Fatalf exits the process and doesn't run defers.
 	// 'l' must be destroyed explicitly after this point!
 
+	if b.procMountSyncFD != -1 {
+		l.SeccompFilterCallback = func() {
+			unix.Close(b.procMountSyncFD)
+			var waitStatus unix.WaitStatus
+			if _, err := unix.Wait4(0, &waitStatus, 0, nil); err != nil {
+				util.Fatalf("error waiting for the proc umounter process: %v", err)
+			}
+			if !waitStatus.Exited() || waitStatus.ExitStatus() != 0 {
+				util.Fatalf("the proc umounter process failed: %v", waitStatus)
+			}
+			if err := unix.Access("/proc/cpuinfo", unix.F_OK); err != unix.ENOENT {
+				util.Fatalf("/proc is still accessible")
+			}
+		}
+	}
+
 	// Notify the parent process the sandbox has booted (and that the controller
 	// is up).
 	startSyncFile := os.NewFile(uintptr(b.startSyncFD), "start-sync file")
@@ -347,6 +379,9 @@ func (b *Boot) prepareArgs(exclude ...string) []string {
 				// This is needed to ensure the new process is killed when the parent
 				// process terminates.
 				args = append(args, "--attached")
+			}
+			if b.procMountSyncFD != -1 {
+				args = append(args, fmt.Sprintf("--proc-mount-sync-fd=%d", b.procMountSyncFD))
 			}
 			if len(b.productName) > 0 {
 				args = append(args, "--product-name", b.productName)

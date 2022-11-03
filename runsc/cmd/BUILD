@@ -6,6 +6,7 @@ go_library(
     name = "cmd",
     srcs = [
         "boot.go",
+        "boot_unsafe.go",
         "capability.go",
         "checkpoint.go",
         "chroot.go",
@@ -45,6 +46,7 @@ go_library(
         "//runsc:__subpackages__",
     ],
     deps = [
+        "//pkg/abi/linux",
         "//pkg/coretag",
         "//pkg/coverage",
         "//pkg/log",
